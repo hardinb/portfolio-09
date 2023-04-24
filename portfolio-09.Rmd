@@ -1,0 +1,145 @@
+---
+title: "Portfolio-09"
+author: "Ben Hardin"
+date: "2023-04-20"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load-data-package}
+library(tidyverse)
+
+HH_feedback <- read.csv("data/HH-feedback.csv")
+```
+
+```{r regression}
+HH_model <- lm(data = HH_feedback, Lying ~ HH)
+summary(HH_model)
+```
+
+```{r plot-1}
+ggplot(HH_feedback, aes(x = HH, y = Lying))+
+  geom_point(position = "jitter", alpha = 0.5)+
+  geom_smooth(method = "lm", se = F, color = "steelblue3", linewidth = 2)+
+  theme_classic()+
+  scale_x_continuous(limits = c(1, 5), expand = c(0, 0))
+```
+
+```{r moderation-gender}
+HH_feedback <- HH_feedback %>%
+  filter(Gender < 3) %>%
+  mutate(Gender_bin = case_when(Gender == 1 ~ "Woman", Gender == 2 ~ "Man"))
+
+HH_moderation <- lm(data = HH_feedback, Lying ~ HH * Gender_bin)
+summary(HH_moderation)
+```
+
+```{r plot-2}
+ggplot(HH_feedback, aes(x = HH, y = Lying, group = Gender_bin))+
+  geom_point(aes(color = Gender_bin, shape = Gender_bin), position = "jitter", alpha = 0.25)+
+  geom_smooth(aes(color = Gender_bin), method = "lm", se = F, linewidth = 2.2)+
+  scale_color_manual(values = c("steelblue2", "navy"))+
+  theme_classic()+
+  scale_x_continuous(limits = c(1, 5), expand = c(0, 0))+
+  scale_y_continuous(limits = c(-1, 1), expand = c(0, 0))
+```
+```{r moderation-age}
+age_moderation <- lm(data = HH_feedback, Lying ~ HH * age)
+summary(age_moderation)
+```
+
+```{r simple-slopes}
+young <- mean(HH_feedback$age, na.rm = T) - sd(HH_feedback$age, na.rm = T)
+avg <- mean(HH_feedback$age, na.rm = T)
+old <- mean(HH_feedback$age, na.rm = T) + sd(HH_feedback$age, na.rm = T)
+
+b0 <-  age_moderation$coeff[1]
+HH <- age_moderation$coeff[2]
+age <- age_moderation$coeff[3]
+HHxage <- age_moderation$coeff[4]
+
+ggplot(HH_feedback, aes(x = HH, y = Lying, group = age_cat))+
+  geom_abline(color = "steelblue1", intercept = b0 + young * age, slope = HH + young * HHxage, linewidth = 2)+
+  geom_abline(color = "steelblue3", intercept = b0 + avg * age, slope = HH + avg * HHxage, linewidth = 2)+
+  geom_abline(color = "navy", intercept = b0 + old * age, slope = HH + old * HHxage, linewidth = 2)+
+  annotate("text", label = "Age:", x = 4.66, y = -.20)+
+  annotate("text", label = "23 years", x = 4.75, y = -.25, color = "navy")+
+  annotate("text", label = "20 years", x = 4.75, y = -.30, color = "steelblue3")+
+  annotate("text", label = "17 years", x = 4.75, y = -.35, color = "steelblue1")+
+  theme_classic()+
+  scale_x_continuous(limits = c(1, 5), expand = c(0, 0))+
+  scale_y_continuous(limits = c(-0.5, 0.5), expand = c(0, 0))
+```
+
+### Prosocial coin-flip
+
+```{r data}
+HH_coin <- read.csv("data/HH-coin.csv")
+
+HH_coin <- HH_coin %>%
+  filter(condition.cat != "pro-self")
+```
+
+```{r logit}
+HH_logit <- glm(decision ~ hh, data = HH_coin, family = "binomial")
+summary(HH_logit)
+```
+
+```{r plot-logit}
+library(ggpointdensity)
+
+ggplot(HH_coin, aes(x = hh, y = decision))+
+  geom_smooth(method = "glm", se = F, method.args = list(family = binomial), linewidth = 2, color = "steelblue2")+
+  theme_classic()+
+  scale_x_continuous(limits = c(1, 5), expand = c(0, 0))
+```
+
+```{r sex-lying}
+HH_coin <- HH_coin %>%
+  filter(sex == "Female" | sex == "Male")
+
+ggplot(HH_coin, aes(x = decision, fill = sex))+
+  geom_bar(color = "black", position = "dodge")
+```
+
+```{r sex-logit}
+sex_logit <- glm(decision ~ hh * sex, data = HH_coin, family = "binomial")
+summary(sex_logit)
+
+ggplot(HH_coin, aes(x = hh, y = decision, group = sex))+
+  geom_smooth(aes(color = sex), method = "glm", se = F, method.args = list(family = binomial), linewidth = 2)+
+  scale_color_manual(values = c("navy", "steelblue1"))+
+  theme_classic()+
+  scale_x_continuous(limits = c(1, 5), expand = c(0, 0))
+```
+
+```{r age-choice}
+ggplot(HH_coin, aes(x = age, y = decision))+
+  geom_smooth(method = "glm", se = F, method.args = list(family = binomial), linewidth = 1.5, color = "black")+
+  theme_classic()
+```
+
+```{r age-logit}
+age_logit <- glm(decision ~ hh * age, data = HH_coin, family = "binomial")
+summary(age_logit)
+```
+
+```{r logit-slopes}
+young <- mean(HH_coin$age, na.rm = T) - sd(HH_coin$age, na.rm = T)
+avg <- mean(HH_coin$age, na.rm = T)
+old <- mean(HH_coin$age, na.rm = T) + sd(HH_coin$age, na.rm = T)
+
+HH_coin <- HH_coin %>%
+  mutate(age_cat = case_when(age <= young ~ "28 and younger",
+                             age > young & age < old ~ "28 to 56",
+                             age >= old ~ "56 and older"))
+
+ggplot(HH_coin, aes(x = hh, y = decision, group = age_cat))+
+  geom_smooth(aes(color = age_cat), method = "glm", se = F, method.args = list(family = binomial), linewidth = 2)+
+  scale_color_manual(values = c("navy", "steelblue3", "steelblue1"))+
+  theme_classic()+
+  scale_x_continuous(limits = c(1, 5), expand = c(0, 0))
+```
