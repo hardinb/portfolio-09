@@ -9,11 +9,23 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+## Intro
+
+For this portfolio piece, I'm interested in running some moderation analyses with various combinations of dichotomous and continuous predictors and outcomes, and visualizing the results from those analyses. I'm also interested in learning a little bit about the relationship between the personality trait Honesty-Humility (HH) and benevolent lying. HH includes trait content related to both being nice to others and also being sincere and honest with others. Thus, it's interesting to know what people who are relatively high on this trait do when telling the truth is not the nice thing to do.
+
+Luckily, there are two studies testing this question that have their data openly available on the internet (Thanks Paul, Ashton, & Lee (2022) and Thielmann, Hilbig, Klein, Seidl, and Heck (2023)!) One study tested whether HH is associated with people's willingness to give dishonest positive feedback on an essay. Another study tested whether HH is associated with people's willingness to lie about the outcome of an economic game so that someone else (either another player or a charity) can get money. I wanted to try to reproduce and compare the results of these two studies, and also test the moderating effects of some demographic variables (specifically age and gender) on the results.
+
+### Prosocial feedback
+
+In this study, the DV is the difference score between ratings that participants believed they were giving privately and ratings they believed they were giving directly to a hypothetical essay writer (the set up for this study was nearly identical to the one described in portfolio 8). A positive difference score is considered prosocial lying, with the assumption being that people intentionally inflated their feedback to be nice to the essay writer. Let's first just predict the difference scores just from participants' HH scores.
+
 ```{r load-data-package}
 library(tidyverse)
 
 HH_feedback <- read.csv("data/HH-feedback.csv")
+## data available from: https://www.sciencedirect.com/science/article/pii/S0092656622000459
 ```
+We find a significant and positive association between HH and the difference scores, suggesting that higher HH is associated with a greater propensity to tell prosocial lies. The plot illustrates that there is a weak, positive linear association between these two variables.
 
 ```{r regression}
 HH_model <- lm(data = HH_feedback, Lying ~ HH)
@@ -25,8 +37,16 @@ ggplot(HH_feedback, aes(x = HH, y = Lying))+
   geom_point(position = "jitter", alpha = 0.5)+
   geom_smooth(method = "lm", se = F, color = "steelblue3", linewidth = 2)+
   theme_classic()+
-  scale_x_continuous(limits = c(1, 5), expand = c(0, 0))
+  scale_x_continuous(limits = c(1, 5), expand = c(0, 0))+
+  labs(y = "Change in rating from Time 1 to Time 2",
+       x = "Honesty-Humility")
 ```
+
+Now let's test whether the participant's gender may moderate the relationship between HH and prosocial lying. Although there are a number of possible gender identities, only a few people in the study reported a gender other than man or woman. Thus, in order to simplify the analysis, I excluded these people and examined gender as a binary variable.
+
+Results did not find a significant moderating effect of gender or a significant main effect of gender. Interestingly, the main effect of HH has also entirely disappeared in this model.
+
+Looking at the plot, we see there is descriptively an interaction in which men aren't inflating feedback very much regardless of their level of HH, whereas women are inflating feedback more to the degree that they are high in HH. However, we can't be very confident in whether these findings would generalize beyond this particular sample.
 
 ```{r moderation-gender}
 HH_feedback <- HH_feedback %>%
@@ -39,19 +59,31 @@ summary(HH_moderation)
 
 ```{r plot-2}
 ggplot(HH_feedback, aes(x = HH, y = Lying, group = Gender_bin))+
-  geom_point(aes(color = Gender_bin, shape = Gender_bin), position = "jitter", alpha = 0.25)+
+  geom_point(aes(color = Gender_bin, shape = Gender_bin), position = "jitter", alpha = 0.35)+
   geom_smooth(aes(color = Gender_bin), method = "lm", se = F, linewidth = 2.2)+
   scale_color_manual(values = c("steelblue2", "navy"))+
   theme_classic()+
   scale_x_continuous(limits = c(1, 5), expand = c(0, 0))+
-  scale_y_continuous(limits = c(-1, 1), expand = c(0, 0))
+  scale_y_continuous(limits = c(-1, 1), expand = c(0, 0))+
+  labs(y = "Change in rating from Time 1 to Time 2",
+       x = "Honesty-Humility",
+       group = "Gender",
+       color = "Gender",
+       shape = "Gender")
 ```
+
+Lastly, let's test whether the relationship between HH and inflating feedback is moderated by age. Again, we don't find any significant main effects or interactions.
+
+I did want to try plotting the simple slopes for the HH x age interaction, using a method developed by Rose Maier. One interesting thing is that there was relatively little variability in age, because these data were collected from a college sample (i.e., the standard deviation for age in this study was only 3 years). This may explain why age did not show any significant effects in this study. Descriptively, there is an interaction in which the association between HH and lying is greater for younger than for older participants.
+
 ```{r moderation-age}
 age_moderation <- lm(data = HH_feedback, Lying ~ HH * age)
 summary(age_moderation)
 ```
 
 ```{r simple-slopes}
+## credit: https://blogs.uoregon.edu/rclub/2014/04/17/simple-slopes-in-ggplot2/
+
 young <- mean(HH_feedback$age, na.rm = T) - sd(HH_feedback$age, na.rm = T)
 avg <- mean(HH_feedback$age, na.rm = T)
 old <- mean(HH_feedback$age, na.rm = T) + sd(HH_feedback$age, na.rm = T)
@@ -71,17 +103,25 @@ ggplot(HH_feedback, aes(x = HH, y = Lying, group = age_cat))+
   annotate("text", label = "17 years", x = 4.75, y = -.35, color = "steelblue1")+
   theme_classic()+
   scale_x_continuous(limits = c(1, 5), expand = c(0, 0))+
-  scale_y_continuous(limits = c(-0.5, 0.5), expand = c(0, 0))
+  scale_y_continuous(limits = c(-0.5, 0.5), expand = c(0, 0))+
+  labs(y = "Change in rating from Time 1 to Time 2",
+       x = "Honesty-Humility")
 ```
 
 ### Prosocial coin-flip
+
+The DV in this study is whether participants reported "Heads" or "Tails" after privately flipping a coin, when saying "Heads" would send $5 to another person or a charity. Since this is a dichotomous outcome, we'll run a logistic regression predicting the decision to say either "Heads" or "Tails" from HH.
 
 ```{r data}
 HH_coin <- read.csv("data/HH-coin.csv")
 
 HH_coin <- HH_coin %>%
   filter(condition.cat != "pro-self")
+
+## data available from: https://onlinelibrary.wiley.com/doi/pdfdirect/10.1111/jopy.12835
 ```
+
+Results show a quite strong negative association between HH and reporting "Heads". In logit speak, the odds ratio = .57. The plot illustrates this strong negative association between HH and the probability of reporting "Heads".
 
 ```{r logit}
 HH_logit <- glm(decision ~ hh, data = HH_coin, family = "binomial")
@@ -94,16 +134,29 @@ library(ggpointdensity)
 ggplot(HH_coin, aes(x = hh, y = decision))+
   geom_smooth(method = "glm", se = F, method.args = list(family = binomial), linewidth = 2, color = "steelblue2")+
   theme_classic()+
-  scale_x_continuous(limits = c(1, 5), expand = c(0, 0))
+  scale_x_continuous(limits = c(1, 5), expand = c(0, 0))+
+  labs(y = "Probability of prosocial cheating",
+       x = "Honesty-Humility")
 ```
+
+Next, let's see whether gender (or, as it was collected in this study, sex) moderates the relationship between HH and prosocial cheating in this study. Descriptively, it looks like females are more likely to tell the truth than to tell a prosocial lie about the coin flip, whereas men are about equally likely to tell the truth vs. lie.
 
 ```{r sex-lying}
 HH_coin <- HH_coin %>%
   filter(sex == "Female" | sex == "Male")
 
 ggplot(HH_coin, aes(x = decision, fill = sex))+
-  geom_bar(color = "black", position = "dodge")
+  geom_bar(color = "black", position = "dodge")+
+  scale_y_continuous(limits = c(0, 161), expand = c(0, 0)) +
+  theme_classic()+
+  theme(axis.text.x=element_blank())+
+  annotate("text", label = "Lie", x = 1, y = 158)+
+  annotate("text", label = "Truth", x = 0, y = 158)+
+  labs(y = "Count",
+       x = "Decision")
 ```
+
+After running a moderated logit regression, we see there is still a significant main of effect of HH, but no significant main effect or moderation by sex. The plot shows a descriptive interaction, whereby the probability of prosocial cheating is more strongly associated with HH for females than for men.
 
 ```{r sex-logit}
 sex_logit <- glm(decision ~ hh * sex, data = HH_coin, family = "binomial")
@@ -113,14 +166,22 @@ ggplot(HH_coin, aes(x = hh, y = decision, group = sex))+
   geom_smooth(aes(color = sex), method = "glm", se = F, method.args = list(family = binomial), linewidth = 2)+
   scale_color_manual(values = c("navy", "steelblue1"))+
   theme_classic()+
-  scale_x_continuous(limits = c(1, 5), expand = c(0, 0))
+  scale_x_continuous(limits = c(1, 5), expand = c(0, 0))+
+  labs(y = "Probability of prosocial cheating",
+       x = "Honesty-Humility")
 ```
+
+Lastly, we'll again try out a moderation by age. Descriptively, we can see that there appears to be a pretty strong association such that the probability of cheating is lower as age increases. We also have a much wider range of ages here than we did in the previous study.
 
 ```{r age-choice}
 ggplot(HH_coin, aes(x = age, y = decision))+
   geom_smooth(method = "glm", se = F, method.args = list(family = binomial), linewidth = 1.5, color = "black")+
-  theme_classic()
+  theme_classic()+
+  labs(y = "Probability of prosocial cheating",
+       x = "Age")
 ```
+
+A moderated logistic regression shows a strong main effect of HH and a strong main effect of age, such that as these increase the probability of prosocial cheating decreases. We also find a significant HH x age interaction. Looking at the predicted probabilities grouped by age, we see that the relationship between HH and the probability of cheating is highly negative for younger adults and becomes increasingly more positive as age increases. (This plot also looks like 3 strands of blue spaghetti, which is pretty cool.)
 
 ```{r age-logit}
 age_logit <- glm(decision ~ hh * age, data = HH_coin, family = "binomial")
@@ -141,5 +202,9 @@ ggplot(HH_coin, aes(x = hh, y = decision, group = age_cat))+
   geom_smooth(aes(color = age_cat), method = "glm", se = F, method.args = list(family = binomial), linewidth = 2)+
   scale_color_manual(values = c("navy", "steelblue3", "steelblue1"))+
   theme_classic()+
-  scale_x_continuous(limits = c(1, 5), expand = c(0, 0))
+  scale_x_continuous(limits = c(1, 5), expand = c(0, 0))+
+  labs(y = "Probability of prosocial cheating",
+       x = "Honesty-Humility",
+       color = "Age",
+       group = "Age")
 ```
